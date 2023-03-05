@@ -1,21 +1,24 @@
-# POC use nestjs dtos on client
+## Use @nesjs DTOs on client & backend
 
-### The first step to archive this is packaging the DTOs on a separated package, that will come with the following advantages:
+I found no information about this, so here is a short description of my steps to get all of this together.
 
-- Prevents duplication between multiple apps and allows to share them between multiples apps.
-- Integrity, if the DTO validations changes you’ll get that changes in all your apps.
-- You can use it on your clients too, allowing frontends to ran same validations that in your controlling, preventing unnecessary API calls.
+### Advantages of packaging DTOs in a separate package:
+
+- Prevents duplication between multiple apps.
+- Consistency, if the DTO validations change, you'll get that changes in all your apps. So:
+  - When you modify the expected payload for a given controller, this will be in sync with the clients using this package.
+- You can also use it on your clients, allowing frontends to run the same validations. That prevent unnecessary API calls.
 
 ### Tips:
 
-1. We used [**tsup](https://tsup.egoist.dev/#what-can-it-bundle)** for the packaging, it’s a really easy way to ge it working
+1. We used [**tsup**](https://tsup.egoist.dev/#what-can-it-bundle) for the packaging, it's a straightforward way to get it working
 2. Keep the dependencies of the packages  neutral (no backend or frontend specific code)
 
 ## Our implementation:
 
-We use [ApiProperty](https://docs.nestjs.com/openapi/types-and-parameters#types-and-parameters) from from `'@nestjs/swagger’`  but this has a dependency with `@nestjs/core` and some additional stuff that is only server related.
+We use [ApiProperty](https://docs.nestjs.com/openapi/types-and-parameters#types-and-parameters) from from `@nestjs/swagger`  but this has a dependency with `@nestjs/core` and some extra stuff that is only server related.
 
-Our way to solve this was to create a function that takes [ApiProperty](https://docs.nestjs.com/openapi/types-and-parameters#types-and-parameters) decorator as a optional parameter, we set the default value as an empty function (a no effect decorator). 
+Our way to solve this was to create a function that takes [ApiProperty](https://docs.nestjs.com/openapi/types-and-parameters#types-and-parameters) decorator as an optional parameter. We set the default value as an empty function (a no-effect decorator). 
 
 This is our implementation:
 
@@ -31,11 +34,18 @@ export const getCreateUserDto = (ApiPropertySwagger?: any) => {
 
   class CreateUserDto {
     @IsEmail()
-    @ApiProperty()
+    @ApiProperty({
+      description: "This is required and must be a valid email",
+      type: String,
+    })
     email: string;
 
     @IsString()
     @MinLength(2)
+    @ApiProperty({
+      description: "This is required and must be at least 2 characters long",
+      type: String,
+    })
     firstName: string;
 
     @IsString()
@@ -50,10 +60,16 @@ export const getCreateUserDto = (ApiPropertySwagger?: any) => {
   return CreateUserDto;
 };
 ```
+#### Wait,  does it work?
+🧙🏼‍♂️ ✨ [**Dependency injection**](https://en.wikipedia.org/wiki/Dependency_injection) ✨
+
+![Here is an screenshot of the swagger api doc working](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/jqf8lzz6yieyf7br1gev.png)
+
+
 
 ### [Backend usage:](https://github.com/facundop3/poc-use-nestjs-dto-on-clients/blob/main/apps/sample-api/src/users/users.dtos.ts)
 
-After doing the following in tour DTO file, you can use it as any other nestjs DTO
+After doing the following in tour DTO file, you can use it as any other NestJs DTO
 
 ```jsx
 import { getCreateUserDto } from '@sample/dtos';
@@ -73,13 +89,13 @@ import { getCreateUserDto } from "@sample/dtos";
 // We don't need `ApiProperty` on the client,
 // so it will fallback on the default empty decorator 
 const _CreateUserDto = getCreateUserDto();
-
+// This allows using it as a TS type and as a constructor class
 class CreateUserDto extends _CreateUserDto {}
 ```
 
-### [Use the DTOs on the frontend:](https://github.com/facundop3/poc-use-nestjs-dto-on-clients/blob/main/apps/web/pages/index.tsx)
+### [Use the DTOs in the frontend:](https://github.com/facundop3/poc-use-nestjs-dto-on-clients/blob/main/apps/web/pages/index.tsx)
 
-If we go int nestjs implementation of DTS we’ll see that they use `class-validator` so we can `use react-hook-forms` + `@hookform/resolvers/class-validator` to use them as validators for our forms:
+If we go int NestJS implementation of DTOs, we'll see that they use `class-validator`, so we can `use react-hook-forms` + `@hookform/resolvers/class-validator` to use them as validators for our forms:
 
 ```tsx
 import { getCreateUserDto } from "@sample/dtos";
@@ -200,3 +216,9 @@ export default function Web() {
   );
 }
 ```
+
+
+## And that's it Github repo: 
+_(I'll be using this same markdown for the repo README.md)_
+
+https://github.com/facundop3/poc-use-nestjs-dto-on-clients
