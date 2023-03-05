@@ -11,12 +11,15 @@ import {
   Input,
   Button,
   theme,
+  Heading,
 } from "@chakra-ui/react";
 import get from "lodash.get";
 import { useState } from "react";
 
+// We don't need `ApiProperty` on the client,
+// so it will fallback on the default empty decorator
 const _CreateUserDto = getCreateUserDto();
-
+// This allows using it as a TS type and as a constructor class
 class CreateUserDto extends _CreateUserDto {}
 
 const resolver = classValidatorResolver(CreateUserDto);
@@ -32,8 +35,8 @@ export default function Web() {
     shouldFocusError: false,
   });
 
-  const submitData = (data: CreateUserDto) => {
-    console.log("submitData: ", data);
+  const submitData = (validatedData: CreateUserDto) => {
+    postUser(validatedData);
   };
 
   const [nestResponse, setNestResponse] = useState<any>(null);
@@ -43,16 +46,16 @@ export default function Web() {
   const lastNameError = get(errors, "lastName.message");
   const nationalityError = get(errors, "nationality.message");
 
-  const data = watch();
+  const notValidatedData = watch();
 
-  const sendWithoutValidation = async () => {
+  const postUser = async (user: CreateUserDto) => {
     fetch("http://localhost:4000/users", {
       method: "POST",
       mode: "cors",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify(user),
     })
       .then((response) => response.json())
       .then((data) => {
@@ -95,13 +98,18 @@ export default function Web() {
         </FormControl>
 
         <Button bg="green.500" color="white" type="submit" w="fit-content">
-          Run DTO validation in the client
+          Run DTO validation in the client + in the server
         </Button>
       </Flex>
       <Flex p="4" flexDir={"column"}>
-        <Button bg="red" onClick={sendWithoutValidation} w="fit-content">
-          Run DTO validation in the server
+        <Button
+          bg="red"
+          onClick={() => postUser(notValidatedData)}
+          w="fit-content"
+        >
+          Run DTO only in the server
         </Button>
+        <Heading>Controller response: </Heading>
         <pre>{JSON.stringify(nestResponse, null, 2)}</pre>
       </Flex>
     </ChakraProvider>

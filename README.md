@@ -1,73 +1,202 @@
-# Turborepo starter
+# POC use nestjs dtos on client
 
-This is an official Yarn v1 starter turborepo.
+### The first step to archive this is packaging the DTOs on a separated package, that will come with the following advantages:
 
-## What's inside?
+- Prevents duplication between multiple apps and allows to share them between multiples apps.
+- Integrity, if the DTO validations changes you’ll get that changes in all your apps.
+- You can use it on your clients too, allowing frontends to ran same validations that in your controlling, preventing unnecessary API calls.
 
-This turborepo uses [Yarn](https://classic.yarnpkg.com/) as a package manager. It includes the following packages/apps:
+### Tips:
 
-### Apps and Packages
+1. We used [**tsup](https://tsup.egoist.dev/#what-can-it-bundle)** for the packaging, it’s a really easy way to ge it working
+2. Keep the dependencies of the packages  neutral (no backend or frontend specific code)
 
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `ui`: a stub React component library shared by both `web` and `docs` applications
-- `eslint-config-custom`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `tsconfig`: `tsconfig.json`s used throughout the monorepo
+## Our implementation:
 
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
+We use [ApiProperty](https://docs.nestjs.com/openapi/types-and-parameters#types-and-parameters) from from `'@nestjs/swagger’`  but this has a dependency with `@nestjs/core` and some additional stuff that is only server related.
 
-### Utilities
+Our way to solve this was to create a function that takes [ApiProperty](https://docs.nestjs.com/openapi/types-and-parameters#types-and-parameters) decorator as a optional parameter, we set the default value as an empty function (a no effect decorator). 
 
-This turborepo has some additional tools already setup for you:
+This is our implementation:
 
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
+### [Packaged DTO (runs in front and backend):](https://github.com/facundop3/poc-use-nestjs-dto-on-clients/blob/main/packages/dtos/src/users/create-user.ts)
 
-### Build
+```tsx
+import { IsEmail, IsOptional, IsString, MinLength } from "class-validator";
 
-To build all apps and packages, run the following command:
+export const getCreateUserDto = (ApiPropertySwagger?: any) => {
+  // We did this to avoid having to include all nest dependencies related to ApiProperty on the client side too
+  // With this approach the value of this decorator will be injected by the server but wont affect the client
+  const ApiProperty = ApiPropertySwagger || function () {};
 
-```
-cd my-turborepo
-yarn run build
-```
+  class CreateUserDto {
+    @IsEmail()
+    @ApiProperty()
+    email: string;
 
-### Develop
+    @IsString()
+    @MinLength(2)
+    firstName: string;
 
-To develop all apps and packages, run the following command:
+    @IsString()
+    @IsOptional()
+    lastName?: string;
 
-```
-cd my-turborepo
-yarn run dev
-```
+    @IsString()
+    @IsOptional()
+    nationality?: string;
+  }
 
-### Remote Caching
-
-Turborepo can use a technique known as [Remote Caching](https://turbo.build/repo/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
-
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup), then enter the following commands:
-
-```
-cd my-turborepo
-npx turbo login
+  return CreateUserDto;
+};
 ```
 
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
+### [Backend usage:](https://github.com/facundop3/poc-use-nestjs-dto-on-clients/blob/main/apps/sample-api/src/users/users.dtos.ts)
 
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your turborepo:
+After doing the following in tour DTO file, you can use it as any other nestjs DTO
 
+```jsx
+import { getCreateUserDto } from '@sample/dtos';
+import { ApiProperty } from '@nestjs/swagger';
+// Here we send `ApiProperty` dependency to  be added to`CreateUserDto`
+export const _CreateUserDto = getCreateUserDto(ApiProperty);
+
+// This allows using it as a TS type and as a constructor class
+export class CreateUserDto extends _CreateUserDto {} 
 ```
-npx turbo link
+
+### [Client usage:](https://github.com/facundop3/poc-use-nestjs-dto-on-clients/blob/main/apps/web/pages/index.tsx)
+
+```tsx
+import { getCreateUserDto } from "@sample/dtos";
+
+// We don't need `ApiProperty` on the client,
+// so it will fallback on the default empty decorator 
+const _CreateUserDto = getCreateUserDto();
+
+class CreateUserDto extends _CreateUserDto {}
 ```
 
-## Useful Links
+### [Use the DTOs on the frontend:](https://github.com/facundop3/poc-use-nestjs-dto-on-clients/blob/main/apps/web/pages/index.tsx)
 
-Learn more about the power of Turborepo:
+If we go int nestjs implementation of DTS we’ll see that they use `class-validator` so we can `use react-hook-forms` + `@hookform/resolvers/class-validator` to use them as validators for our forms:
 
-- [Tasks](https://turbo.build/repo/docs/core-concepts/monorepos/running-tasks)
-- [Caching](https://turbo.build/repo/docs/core-concepts/caching)
-- [Remote Caching](https://turbo.build/repo/docs/core-concepts/remote-caching)
-- [Filtering](https://turbo.build/repo/docs/core-concepts/monorepos/filtering)
-- [Configuration Options](https://turbo.build/repo/docs/reference/configuration)
-- [CLI Usage](https://turbo.build/repo/docs/reference/command-line-reference)
+```tsx
+import { getCreateUserDto } from "@sample/dtos";
+import { useForm } from "react-hook-form";
+import { classValidatorResolver } from "@hookform/resolvers/class-validator";
+import {
+  FormControl,
+  FormLabel,
+  FormErrorMessage,
+  FormHelperText,
+  ChakraProvider,
+  Flex,
+  Input,
+  Button,
+  theme,
+  Heading,
+} from "@chakra-ui/react";
+import get from "lodash.get";
+import { useState } from "react";
+
+// We don't need `ApiProperty` on the client,
+// so it will fallback on the default empty decorator
+const _CreateUserDto = getCreateUserDto();
+// This allows using it as a TS type and as a constructor class
+class CreateUserDto extends _CreateUserDto {}
+
+const resolver = classValidatorResolver(CreateUserDto);
+
+export default function Web() {
+  const {
+    watch,
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<CreateUserDto>({
+    resolver,
+    shouldFocusError: false,
+  });
+
+  const submitData = (validatedData: CreateUserDto) => {
+    postUser(validatedData);
+  };
+
+  const [nestResponse, setNestResponse] = useState<any>(null);
+
+  const emailError = get(errors, "email.message");
+  const firstNameError = get(errors, "firstName.message");
+  const lastNameError = get(errors, "lastName.message");
+  const nationalityError = get(errors, "nationality.message");
+
+  const notValidatedData = watch();
+
+  const postUser = async (user: CreateUserDto) => {
+    fetch("http://localhost:4000/users", {
+      method: "POST",
+      mode: "cors",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(user),
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        setNestResponse(data);
+      });
+  };
+
+  return (
+    <ChakraProvider theme={theme}>
+      <Flex
+        as="form"
+        onSubmit={handleSubmit(submitData)}
+        noValidate
+        flexDir={"column"}
+        p={4}
+      >
+        <FormControl isInvalid={Boolean(emailError)}>
+          <FormLabel>Email address</FormLabel>
+          <Input type="email" {...register("email")} />
+          {!emailError && <FormHelperText>share your email.</FormHelperText>}
+          <FormErrorMessage>{emailError}</FormErrorMessage>
+        </FormControl>
+        <FormControl isInvalid={Boolean(firstNameError)}>
+          <FormLabel>First Name</FormLabel>
+          <Input {...register("firstName")} />
+          {!firstNameError && <FormHelperText>type your name.</FormHelperText>}
+          <FormErrorMessage>{firstNameError}</FormErrorMessage>
+        </FormControl>
+        <FormControl isInvalid={Boolean(lastNameError)}>
+          <FormLabel>Last name</FormLabel>
+          <Input {...register("lastName")} />
+          {!lastNameError && <FormHelperText>this is optional.</FormHelperText>}
+          <FormErrorMessage>{lastNameError}</FormErrorMessage>
+        </FormControl>
+        <FormControl isInvalid={Boolean(nationalityError)}>
+          <FormLabel>Nationality</FormLabel>
+          <Input {...register("nationality")} />
+          {!nationalityError && <FormHelperText>🇺🇾</FormHelperText>}
+          <FormErrorMessage>{nationalityError}</FormErrorMessage>
+        </FormControl>
+
+        <Button bg="green.500" color="white" type="submit" w="fit-content">
+          Run DTO validation in the client + in the server
+        </Button>
+      </Flex>
+      <Flex p="4" flexDir={"column"}>
+        <Button
+          bg="red"
+          onClick={() => postUser(notValidatedData)}
+          w="fit-content"
+        >
+          Run DTO only in the server
+        </Button>
+        <Heading>Controller response: </Heading>
+        <pre>{JSON.stringify(nestResponse, null, 2)}</pre>
+      </Flex>
+    </ChakraProvider>
+  );
+}
+```
