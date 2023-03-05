@@ -7,11 +7,18 @@ export const getCreateUserDto = (ApiPropertySwagger?: any) => {
 
   class CreateUserDto {
     @IsEmail()
-    @ApiProperty()
+    @ApiProperty({
+      description: "This is required and must be a valid email",
+      type: String,
+    })
     email: string;
 
     @IsString()
     @MinLength(2)
+    @ApiProperty({
+      description: "This is required and must be at least 2 characters long",
+      type: String,
+    })
     firstName: string;
 
     @IsString()
