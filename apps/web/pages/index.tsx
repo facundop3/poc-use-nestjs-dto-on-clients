@@ -11,9 +11,9 @@ import {
   Input,
   Button,
   theme,
-  useBoolean,
 } from "@chakra-ui/react";
 import get from "lodash.get";
+import { useState } from "react";
 
 const _CreateUserDto = getCreateUserDto();
 
@@ -23,6 +23,7 @@ const resolver = classValidatorResolver(CreateUserDto);
 
 export default function Web() {
   const {
+    watch,
     register,
     handleSubmit,
     formState: { errors },
@@ -35,12 +36,29 @@ export default function Web() {
     console.log("submitData: ", data);
   };
 
-  console.log("error: ", errors);
+  const [nestResponse, setNestResponse] = useState<any>(null);
 
   const emailError = get(errors, "email.message");
   const firstNameError = get(errors, "firstName.message");
   const lastNameError = get(errors, "lastName.message");
   const nationalityError = get(errors, "nationality.message");
+
+  const data = watch();
+
+  const sendWithoutValidation = async () => {
+    fetch("http://localhost:4000/users", {
+      method: "POST",
+      mode: "cors",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        setNestResponse(data);
+      });
+  };
 
   return (
     <ChakraProvider theme={theme}>
@@ -77,8 +95,14 @@ export default function Web() {
         </FormControl>
 
         <Button bg="green.500" color="white" type="submit" w="fit-content">
-          Send
+          Run DTO validation in the client
         </Button>
+      </Flex>
+      <Flex p="4" flexDir={"column"}>
+        <Button bg="red" onClick={sendWithoutValidation} w="fit-content">
+          Run DTO validation in the server
+        </Button>
+        <pre>{JSON.stringify(nestResponse, null, 2)}</pre>
       </Flex>
     </ChakraProvider>
   );

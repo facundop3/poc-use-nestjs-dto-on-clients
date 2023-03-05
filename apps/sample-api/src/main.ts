@@ -12,6 +12,9 @@ async function bootstrap() {
       exceptionFactory: (errors) => new BadRequestException(errors),
     }),
   );
+
+  app.enableCors();
+
   await app.listen(4000);
 }
 bootstrap();
