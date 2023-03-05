@@ -1,24 +1,85 @@
-import { getCreateUserDto, validate } from "@sample/dtos";
-import { Button } from "ui";
+import { getCreateUserDto } from "@sample/dtos";
+import { useForm } from "react-hook-form";
+import { classValidatorResolver } from "@hookform/resolvers/class-validator";
+import {
+  FormControl,
+  FormLabel,
+  FormErrorMessage,
+  FormHelperText,
+  ChakraProvider,
+  Flex,
+  Input,
+  Button,
+  theme,
+  useBoolean,
+} from "@chakra-ui/react";
+import get from "lodash.get";
 
-const CreateUserDto = getCreateUserDto();
+const _CreateUserDto = getCreateUserDto();
+
+class CreateUserDto extends _CreateUserDto {}
+
+const resolver = classValidatorResolver(CreateUserDto);
 
 export default function Web() {
-  const dtoInstance = new CreateUserDto();
-  dtoInstance.email = "test";
-  const result = validate(dtoInstance)
-    .then((result: any) => console.log(result))
-    .catch((err: any) => console.log(err));
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<CreateUserDto>({
+    resolver,
+    shouldFocusError: false,
+  });
 
-  const userPayload: CreateUserDto = { email: "hello" };
+  const submitData = (data: CreateUserDto) => {
+    console.log("submitData: ", data);
+  };
 
-  console.log(userPayload);
+  console.log("error: ", errors);
 
-  console.log(Object.keys(result));
+  const emailError = get(errors, "email.message");
+  const firstNameError = get(errors, "firstName.message");
+  const lastNameError = get(errors, "lastName.message");
+  const nationalityError = get(errors, "nationality.message");
+
   return (
-    <div>
-      <h1>Web</h1>
-      <Button />
-    </div>
+    <ChakraProvider theme={theme}>
+      <Flex
+        as="form"
+        onSubmit={handleSubmit(submitData)}
+        noValidate
+        flexDir={"column"}
+        p={4}
+      >
+        <FormControl isInvalid={Boolean(emailError)}>
+          <FormLabel>Email address</FormLabel>
+          <Input type="email" {...register("email")} />
+          {!emailError && <FormHelperText>share your email.</FormHelperText>}
+          <FormErrorMessage>{emailError}</FormErrorMessage>
+        </FormControl>
+        <FormControl isInvalid={Boolean(firstNameError)}>
+          <FormLabel>First Name</FormLabel>
+          <Input {...register("firstName")} />
+          {!firstNameError && <FormHelperText>type your name.</FormHelperText>}
+          <FormErrorMessage>{firstNameError}</FormErrorMessage>
+        </FormControl>
+        <FormControl isInvalid={Boolean(lastNameError)}>
+          <FormLabel>Last name</FormLabel>
+          <Input {...register("lastName")} />
+          {!lastNameError && <FormHelperText>this is optional.</FormHelperText>}
+          <FormErrorMessage>{lastNameError}</FormErrorMessage>
+        </FormControl>
+        <FormControl isInvalid={Boolean(nationalityError)}>
+          <FormLabel>Nationality</FormLabel>
+          <Input {...register("nationality")} />
+          {!nationalityError && <FormHelperText>🇺🇾</FormHelperText>}
+          <FormErrorMessage>{nationalityError}</FormErrorMessage>
+        </FormControl>
+
+        <Button bg="green.500" color="white" type="submit" w="fit-content">
+          Send
+        </Button>
+      </Flex>
+    </ChakraProvider>
   );
 }
